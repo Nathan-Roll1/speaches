@@ -1,0 +1,48 @@
+name: Orukeet fork validation
+
+on:
+  push:
+    branches: [codex/orukeet-ci]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DO_NOT_TRACK: 1
+  GRADIO_ANALYTICS_ENABLED: "False"
+  DISABLE_TELEMETRY: 1
+  HF_HUB_DISABLE_TELEMETRY: 1
+  PYANNOTE_METRICS_ENABLED: 0
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: 4134dd18c9cd9bb6c2bbd65aa8ac3d3502139393
+          persist-credentials: false
+      - name: Install audio libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes ffmpeg libportaudio2
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.10.11
+          enable-cache: true
+          activate-environment: true
+      - run: uv python install
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check --diff .
+      - run: uv run pyrefly check
+      - name: Run tests without external credentials
+        run: uv run pytest -m "not requires_openai and not requires_gated_hf_model" tests/ --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results.xml
+          if-no-files-found: ignore
