@@ -1,0 +1,37 @@
+name: Baseline chat backend requirement
+on:
+  push:
+    branches: [codex/orukeet-baseline-ci]
+permissions:
+  contents: read
+env:
+  DO_NOT_TRACK: 1
+  HF_HUB_DISABLE_TELEMETRY: 1
+  DISABLE_TELEMETRY: 1
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: 993994f7984bf3fe9655b267448328cf66fccb42
+          persist-credentials: false
+      - run: sudo apt-get update -qq && sudo apt-get install --yes ffmpeg libportaudio2
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: 0.10.11
+          activate-environment: true
+      - run: uv python install && uv sync --locked
+      - name: Reproduce external chat dependency on unchanged upstream
+        run: >-
+          uv run pytest tests/realtime/realtime_conversation_test.py
+          -m "not requires_openai"
+          -k "test_realtime_conversation_item_create_with_previous_item_id"
+          --junitxml=baseline-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: baseline-results
+          path: baseline-results.xml
+          if-no-files-found: ignore
