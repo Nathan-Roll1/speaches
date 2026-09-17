@@ -39,7 +39,12 @@ jobs:
       - run: uv run ruff format --check --diff .
       - run: uv run pyrefly check
       - name: Run tests without external credentials
-        run: uv run pytest -m "not requires_openai and not requires_gated_hf_model" tests/ --junitxml=test-results.xml
+        # These two unmarked realtime cases also generate text through an
+        # external chat backend. The fork has neither that service nor secrets.
+        run: >-
+          uv run pytest -m "not requires_openai and not requires_gated_hf_model"
+          -k "not test_realtime_conversation_item_create_with_previous_item_id"
+          tests/ --junitxml=test-results.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
